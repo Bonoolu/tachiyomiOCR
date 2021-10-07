@@ -232,6 +232,8 @@ object PreferenceKeys {
 
     const val ankiMeaningExportFields = "anki_meaning_export_fields"
 
+    const val ankiBoldTargetWord = "anki_bold_target_word"
+
     fun trackUsername(syncId: Int) = "pref_mangasync_username_$syncId"
 
     fun trackPassword(syncId: Int) = "pref_mangasync_password_$syncId"

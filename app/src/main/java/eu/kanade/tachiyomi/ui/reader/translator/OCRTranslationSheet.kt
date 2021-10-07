@@ -31,6 +31,7 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
     private val mDeinflector: Deinflector = Deinflector(context)
     private val ocrResultText: String
         get() = ocrResult.joinToString("") { it.first() }
+    private val inflictedKanji: MutableMap<String, String> = mutableMapOf()
 
     init {
         setContentView(binding.root)
@@ -64,6 +65,14 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
         populateResults(rankResults(getMatchedEntries(text, index, result)))
     }
 
+    private fun makeTargetWordBold(sentence: String, word: String): String {
+        if (word.isEmpty()) {
+            return sentence
+        }
+        val pos = sentence.indexOf(word)
+        return sentence.substring(0, pos) + "<b>" + word + "</b>" + sentence.substring(pos + word.length, sentence.length)
+    }
+
     @SuppressLint("SetTextI18n")
     private fun populateResults(results: List<EntryOptimized>) {
         binding.dictResults.isVisible = results.isNotEmpty()
@@ -93,10 +102,13 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
                     val wordFields = pref.ankiWordExportFields()
                     val readingFields = pref.ankiReadingExportFields()
                     val meaningFields = pref.ankiMeaningExportFields()
+                    val boldTargetWord = pref.ankiBoldTargetWord()
 
                     val fields = api.getFieldList(model.key).map {
                         var content = arrayOf<String>()
-                        if (sentenceFields.contains(it)) {
+                        if (sentenceFields.contains(it) && boldTargetWord) {
+                            content += makeTargetWordBold(ocrResultText, inflictedKanji[result.kanji] ?: "")
+                        } else if (sentenceFields.contains(it)) {
                             content += ocrResultText
                         }
                         if (wordFields.contains(it)) {
@@ -150,6 +162,9 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
                     }
 
                     if (valid) {
+                        if (!inflictedKanji.containsKey(entry.kanji)) {
+                            inflictedKanji.put(entry.kanji.toString(), word)
+                        }
                         results.add(entry)
                         seenEntries.add(entry)
                     }

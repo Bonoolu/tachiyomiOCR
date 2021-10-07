@@ -102,6 +102,12 @@ class SettingsOCRController : SettingsController() {
                             }
                         }.launchIn(viewScope)
                     }
+
+                    checkBoxPreference {
+                        key = Keys.ankiBoldTargetWord
+                        titleRes = R.string.pref_anki_bold_target_word
+                        defaultValue = false
+                    }
                 }
             }
         }

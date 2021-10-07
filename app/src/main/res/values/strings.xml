@@ -785,5 +785,6 @@
     <string name="pref_anki_deck_name">Anki Export Deck</string>
     <string name="pref_anki_model_name">Anki Export Note Type</string>
     <string name="anki_fields_routing">Export Field Routing</string>
+    <string name="pref_anki_bold_target_word">Mark target word bold in OCR\'d sentence</string>
 
 </resources>
