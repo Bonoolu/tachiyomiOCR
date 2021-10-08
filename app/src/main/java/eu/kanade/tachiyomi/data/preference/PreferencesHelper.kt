@@ -334,4 +334,6 @@ class PreferencesHelper(val context: Context) {
     fun ankiReadingExportFields() = prefs.getStringSet(Keys.ankiReadingExportFields, setOf())!!
 
     fun ankiMeaningExportFields() = prefs.getStringSet(Keys.ankiMeaningExportFields, setOf())!!
+
+    fun ankiScreenshotExportFields() = prefs.getStringSet(Keys.ankiScreenshotExportFields, setOf())!!
 }

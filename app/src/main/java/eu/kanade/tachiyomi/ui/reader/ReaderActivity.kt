@@ -16,6 +16,7 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment.getExternalStorageDirectory
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Menu
@@ -281,6 +282,35 @@ class ReaderActivity : BaseRxActivity<ReaderActivityBinding, ReaderPresenter>() 
                 it.height().toInt()
             )
             launchIO { startOCR(b) }
+        }
+    }
+
+    private fun File.writeBitmap(bitmap: Bitmap, format: Bitmap.CompressFormat, quality: Int) {
+        outputStream().use { out ->
+            bitmap.compress(format, quality, out)
+            out.flush()
+        }
+    }
+
+    fun takeScreenshot(filename: String) {
+        toggleMenu()
+        val ocrRectangleView = findViewById<OCRRectangleView>(R.id.ocr_rectangle)
+        ocrRectangleView.isVisible = true
+        ocrRectangleView.longTapCallback = {
+            ocrRectangleView.isVisible = false
+            val b = Bitmap.createBitmap(
+                viewer!!.getView().drawToBitmap(Bitmap.Config.ARGB_8888),
+                it.left.toInt(),
+                it.top.toInt(),
+                it.width().toInt(),
+                it.height().toInt()
+            )
+            val collectionPath = File(getExternalStorageDirectory().getAbsolutePath().toString() + "/AnkiDroid/collection.media/")
+            if (!collectionPath.exists()) {
+                collectionPath.mkdirs()
+            }
+            File(collectionPath, filename).writeBitmap(b, Bitmap.CompressFormat.JPEG, 85)
+            toast("Sceenshot saved!")
         }
     }
 

@@ -20,7 +20,9 @@ import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.DictionaryEntryBinding
 import eu.kanade.tachiyomi.databinding.OcrResultCharacterBinding
 import eu.kanade.tachiyomi.databinding.OcrTranslationSheetBinding
+import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.util.lang.launchUI
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.Collections.rotate
 import kotlin.collections.HashSet
@@ -93,7 +95,8 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
                     val wordFields = pref.ankiWordExportFields()
                     val readingFields = pref.ankiReadingExportFields()
                     val meaningFields = pref.ankiMeaningExportFields()
-
+                    val screenshotFields = pref.ankiScreenshotExportFields()
+                    var createScreenshot = false
                     val fields = api.getFieldList(model.key).map {
                         var content = arrayOf<String>()
                         if (sentenceFields.contains(it)) {
@@ -108,10 +111,25 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
                         if (meaningFields.contains(it)) {
                             content += entry.dictionaryMeaning.text.toString()
                         }
+                        if (screenshotFields.contains(it)) {
+                            createScreenshot = true
+                            // I had to choose between doing this or raising the API Level to 26
+                            @SuppressLint("DirectDateInstantiation")
+                            val filename: String = "SC_" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date()) + ".jpg"
+                            if (ownerActivity is ReaderActivity) {
+                                (ownerActivity as ReaderActivity).takeScreenshot(filename)
+                            }
+                            content += "<img src='$filename'/>"
+                            this.cancel()
+                        }
                         content.joinToString("\n")
                     }
                     api.addNote(model.key, deck.key, fields.toTypedArray(), null)
-                    Toast.makeText(context, "Card added successfully!", Toast.LENGTH_SHORT).show()
+                    if (createScreenshot) {
+                        Toast.makeText(context, "Card added successfully! Please select screenshot area!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Card added successfully!", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
