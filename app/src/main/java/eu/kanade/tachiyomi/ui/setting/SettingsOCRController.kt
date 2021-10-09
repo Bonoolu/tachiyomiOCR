@@ -117,6 +117,23 @@ class SettingsOCRController : SettingsController() {
                                 entryValues = fields
                             }
                         }.launchIn(viewScope)
+                    }
+
+                    multiSelectListPreference {
+                        key = Keys.ankiAudioExportFields
+                        titleRes = R.string.anki_field_audio
+                        entries = arrayOf()
+                        entryValues = arrayOf()
+                        setSummaryProvider { values.joinToString() }
+                        preferences.ankiModelName().asImmediateFlow { modelName ->
+                            if (modelName.isNotEmpty()) {
+                                val modelId = api.modelList.toList().first { it.second == modelName }.first
+                                val fields = api.getFieldList(modelId)
+                                entries = fields
+                                entryValues = fields
+                            }
+                        }.launchIn(viewScope)
+                    }
 
                     checkBoxPreference {
                         key = Keys.ankiBoldTargetWord
