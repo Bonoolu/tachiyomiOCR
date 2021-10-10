@@ -155,7 +155,82 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
         handler.post { Toast.makeText(context, text, Toast.LENGTH_LONG).show() }
     }
 
-    @SuppressLint("SetTextI18n", "DirectDateInstantiation")
+    @SuppressLint("DirectDateInstantiation")
+    private fun createAnkiNode(entry: DictionaryEntryBinding, result: EntryOptimized) {
+        if (context.checkSelfPermission(READ_WRITE_PERMISSION) != PERMISSION_GRANTED) {
+            return Toast.makeText(context, "You must setup anki integration in the settings first", Toast.LENGTH_SHORT).show()
+        }
+        AddContentApi.getAnkiDroidPackageName(context)
+            ?: return Toast.makeText(context, "Couldn't find ankiDroid", Toast.LENGTH_SHORT).show()
+        val pref = PreferencesHelper(context)
+        val api = AddContentApi(context)
+        val deckName = pref.ankiDeckName().get()
+        val modelName = pref.ankiModelName().get()
+        val deck = api.deckList.entries.firstOrNull { it.value == deckName }
+            ?: return Toast.makeText(context, "Deck '$deckName' was not found", Toast.LENGTH_SHORT).show()
+        val model = api.modelList.entries.firstOrNull { it.value == modelName }
+            ?: return Toast.makeText(context, "Note type '$modelName' was not found", Toast.LENGTH_SHORT).show()
+
+        val sentenceFields = pref.ankiSentenceExportFields()
+        val wordFields = pref.ankiWordExportFields()
+        val readingFields = pref.ankiReadingExportFields()
+        val meaningFields = pref.ankiMeaningExportFields()
+        val screenshotFields = pref.ankiScreenshotExportFields()
+        var createScreenshot = false
+        val boldTargetWord = pref.ankiBoldTargetWord()
+        val audioFields = pref.ankiAudioExportFields()
+        val dialog = this
+        val fields = api.getFieldList(model.key).map {
+            var content = arrayOf<String>()
+            if (sentenceFields.contains(it) && boldTargetWord) {
+                content += makeTargetWordBold(ocrResultText, inflictedKanji[result.kanji] ?: "")
+            } else if (sentenceFields.contains(it)) {
+                content += ocrResultText
+            }
+            if (wordFields.contains(it)) {
+                content += result.kanji ?: ""
+            }
+            if (readingFields.contains(it)) {
+                content += result.readings ?: ""
+            }
+            if (meaningFields.contains(it)) {
+                content += entry.dictionaryMeaning.text.toString()
+            }
+            if (audioFields.contains(it)) {
+                val filename: String = "A_" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date()) + ".mp3"
+                val collectionPath = File(getExternalStorageDirectory().absolutePath.toString() + "/AnkiDroid/collection.media/")
+                if (!collectionPath.exists()) {
+                    collectionPath.mkdirs()
+                }
+                val audioFile = File(collectionPath, filename)
+                downloadAudio(pickReading(result.readings.toString()), result.kanji.toString(), audioFile)
+                if (audioFile.length() != 52288L) { // The audio file with this length is a spoken 404 not found message
+                    content += "[sound:$filename]"
+                } else {
+                    audioFile.delete()
+                }
+            }
+            if (screenshotFields.contains(it)) {
+                createScreenshot = true
+                // I had to choose between doing this or raising the API Level to 26
+                @SuppressLint("DirectDateInstantiation")
+                val filename: String = "SC_" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date()) + ".jpg"
+                takeScreenshot(filename)
+                content += "<img src='$filename'/>"
+                dialog.cancel()
+            }
+            content.joinToString("\n")
+        }
+        api.addNote(model.key, deck.key, fields.toTypedArray(), null)
+
+        if (createScreenshot) {
+            createToast(context, "Card added successfully! Please select screenshot area!")
+        } else {
+            createToast(context, "Card added successfully!")
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
     private fun populateResults(results: List<EntryOptimized>) {
         binding.dictResults.isVisible = results.isNotEmpty()
         binding.dictNoResults.isVisible = results.isEmpty()
@@ -169,78 +244,8 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
                     Executors.newSingleThreadExecutor().submit { playAudio(result.readings.toString(), result.kanji.toString()) }
                 }
                 entry.addToAnki.setOnClickListener {
-                    if (context.checkSelfPermission(READ_WRITE_PERMISSION) != PERMISSION_GRANTED) {
-                        return@setOnClickListener Toast.makeText(context, "You must setup anki integration in the settings first", Toast.LENGTH_SHORT).show()
-                    }
-                    AddContentApi.getAnkiDroidPackageName(context)
-                        ?: return@setOnClickListener Toast.makeText(context, "Couldn't find ankiDroid", Toast.LENGTH_SHORT).show()
-                    val pref = PreferencesHelper(context)
-                    val api = AddContentApi(context)
-                    val deckName = pref.ankiDeckName().get()
-                    val modelName = pref.ankiModelName().get()
-                    val deck = api.deckList.entries.firstOrNull { it.value == deckName }
-                        ?: return@setOnClickListener Toast.makeText(context, "Deck '$deckName' was not found", Toast.LENGTH_SHORT).show()
-                    val model = api.modelList.entries.firstOrNull { it.value == modelName }
-                        ?: return@setOnClickListener Toast.makeText(context, "Note type '$modelName' was not found", Toast.LENGTH_SHORT).show()
-
-                    val sentenceFields = pref.ankiSentenceExportFields()
-                    val wordFields = pref.ankiWordExportFields()
-                    val readingFields = pref.ankiReadingExportFields()
-                    val meaningFields = pref.ankiMeaningExportFields()
-                    val screenshotFields = pref.ankiScreenshotExportFields()
-                    var createScreenshot = false
-                    val boldTargetWord = pref.ankiBoldTargetWord()
-                    val audioFields = pref.ankiAudioExportFields()
-                    val dialog = this
                     Executors.newSingleThreadExecutor().submit {
-                        val fields = api.getFieldList(model.key).map {
-                            var content = arrayOf<String>()
-                            if (sentenceFields.contains(it) && boldTargetWord) {
-                                content += makeTargetWordBold(ocrResultText, inflictedKanji[result.kanji] ?: "")
-                            } else if (sentenceFields.contains(it)) {
-                                content += ocrResultText
-                            }
-                            if (wordFields.contains(it)) {
-                                content += result.kanji ?: ""
-                            }
-                            if (readingFields.contains(it)) {
-                                content += result.readings ?: ""
-                            }
-                            if (meaningFields.contains(it)) {
-                                content += entry.dictionaryMeaning.text.toString()
-                            }
-                            if (audioFields.contains(it)) {
-                                val filename: String = "A_" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date()) + ".mp3"
-                                val collectionPath = File(getExternalStorageDirectory().absolutePath.toString() + "/AnkiDroid/collection.media/")
-                                if (!collectionPath.exists()) {
-                                    collectionPath.mkdirs()
-                                }
-                                val audioFile = File(collectionPath, filename)
-                                downloadAudio(pickReading(result.readings.toString()), result.kanji.toString(), audioFile)
-                                if (audioFile.length() != 52288L) { // The audio file with this length is a spoken 404 not found message
-                                    content += "[sound:$filename]"
-                                } else {
-                                    audioFile.delete()
-                                }
-                            }
-                            if (screenshotFields.contains(it)) {
-                                createScreenshot = true
-                                // I had to choose between doing this or raising the API Level to 26
-                                @SuppressLint("DirectDateInstantiation")
-                                val filename: String = "SC_" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date()) + ".jpg"
-                                takeScreenshot(filename)
-                                content += "<img src='$filename'/>"
-                                dialog.cancel()
-                            }
-                            content.joinToString("\n")
-                        }
-                        api.addNote(model.key, deck.key, fields.toTypedArray(), null)
-
-                        if (createScreenshot) {
-                            createToast(context, "Card added successfully! Please select screenshot area!")
-                        } else {
-                            createToast(context, "Card added successfully!")
-                        }
+                        createAnkiNode(entry, result)
                     }
                 }
             }
