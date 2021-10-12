@@ -2,7 +2,9 @@ package eu.kanade.tachiyomi.ui.reader.translator
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -247,6 +249,18 @@ class OCRTranslationSheet(activity: Activity, private val ocrResult: List<List<S
                     Executors.newSingleThreadExecutor().submit {
                         createAnkiNode(entry, result)
                     }
+                }
+                entry.addToAnki.setOnLongClickListener {
+                    if (AddContentApi.getAnkiDroidPackageName(context) == null) {
+                        Toast.makeText(context, "Couldn't find ankiDroid", Toast.LENGTH_SHORT).show()
+                        return@setOnLongClickListener false
+                    }
+
+                    val intent = Intent(Intent.ACTION_PROCESS_TEXT)
+                    intent.putExtra(Intent.EXTRA_PROCESS_TEXT, "deck:" + PreferencesHelper(context).ankiDeckName().get() + pickReading(result.readings.toString()))
+                    intent.setComponent(ComponentName("com.ichi2.anki", "com.ichi2.anki.CardBrowser"))
+                    context.startActivity(intent)
+                    return@setOnLongClickListener true
                 }
             }
         }
